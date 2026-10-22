@@ -51,6 +51,10 @@ parse_tilemap_and_tilesets :: proc(path: string, alloc: mem.Allocator) -> Map {
 		panic("parse_tilemap_and_tilesets::error")
 	}
 
+	if !ok {
+		panic("parse_tilemap_and_tilesets::error")
+	}
+
 	dir := filepath.dir(path)
 	for &ts in m.tilesets {
 		if ts.source == "" do continue
@@ -112,10 +116,12 @@ PropertyData :: union {
 MapOrientation :: enum {
 	Orthogonal,
 	Isometric,
+	Oblique,
 	Staggered,
 	Hexagonal,
 	orthogonal = Orthogonal,
 	isometric = Isometric,
+	oblique = Oblique,
 	staggered = Staggered,
 	hexagonal = Hexagonal,
 }
@@ -137,13 +143,13 @@ MapStaggerAxis :: enum {
 
 LayerType :: enum {
 	TileLayer,
-	ObjectLayer,
+	ObjectGroup,
 	ImageLayer,
-	LayerGroup,
+	Group,
 	tilelayer = TileLayer,
-	objectgroup = ObjectLayer,
+	objectgroup = ObjectGroup,
 	imagelayer = ImageLayer,
-	group = LayerGroup,
+	group = Group,
 }
 
 LayerCompression :: enum {
@@ -172,6 +178,23 @@ GridOrientation :: enum {
 	isometric = Isometric,
 }
 
+BlendMode :: enum {
+	normal,
+	add,
+	multiply,
+	screen,
+	overlay,
+	darken,
+	lighten,
+	color_dodge,
+	color_burn,
+	hard_light,
+	soft_light,
+	difference,
+	exclusion,
+}
+
+
 // Map describes a Tiled map.
 Map :: struct {
 	background_color:  string `json:"backgroundcolor"`, // Hex-formatted color (#RRGGBB or #AARRGGBB) (optional).
@@ -184,10 +207,12 @@ Map :: struct {
 	next_layer_id:     i32 `json:"nextlayerid"`, // Auto-increments for each layer.
 	next_object_id:    i32 `json:"nextobjectid"`, // Auto-increments for each placed object.
 	orientation:       MapOrientation `json:"orientation"`, // "orthogonal", "isometric", "staggered" or "hexagonal".
+	parallax_origin_x: f32 `json:"parallaxoriginx"`, // X coordinate of the parallax origin in pixels (since 1.8, default: 0)
+	parallax_origin_y: f32 `json:"parallaxoriginy"`, // Y coordinate of the parallax origin in pixels (since 1.8, default: 0)
 	properties:        []Property `json:"properties"`, // A list of properties (name, value, type).
 	render_order:      string `json:"renderorder"`, // Rendering direction (orthogonal maps only).
-	// skewx X offset applied per tile row (oblique maps only)
-	// skewy Y offset applied per tile column (oblique maps only)
+	skew_x:            i32 `json:"skewx"`, // skewx X offset applied per tile row (oblique maps only)
+	skew_y:            i32 `json:"skewy"`, // skewy Y offset applied per tile column (oblique maps only)
 	stagger_axis:      MapStaggerAxis `json:"staggeraxis"`, // "x" or "y" (staggered / hexagonal maps only).
 	stagger_index:     string `json:"staggerindex"`, // "odd" or "even" (staggered / hexagonal maps only).
 	tiled_version:     string `json:"tiledversion"`, // The Tiled version used to save the file.
@@ -195,15 +220,8 @@ Map :: struct {
 	tilesets:          []Tileset `json:"tilesets"`, // Array of Tilesets.
 	tile_width:        i32 `json:"tilewidth"`, // Map grid width.
 	type:              string `json:"type"`, // "map" (since 1.0).
-	version:           f32 `json:"version"`, // The JSON format version.
+	version:           string `json:"version"`, // The JSON format version (previously a number, saved as string since 1.6)
 	width:             i32 `json:"width"`, // Number of tile columns.
-}
-
-Property :: struct {
-	name:          string `json:"name"`, // Name of property
-	type:          string `json:"type"`, // Type of property value
-	property_type: string `json:"type"`,
-	value:         PropertyData `json:"value"`, // Value of property
 }
 
 
@@ -211,19 +229,20 @@ Layer :: struct {
 	chunks:            []Chunk `json:"chunks"`, // Array of chunks (optional, for ininite maps)
 	class:             string `json:"name"`,
 	compression:       LayerCompression `json:"compression"`, // "zlib", "gzip" or empty (default)
-	data:              []i32 `json:"data"`,
+	// data:              []i32 `json:"data"`,
+	data:              ArrayOrString `json:"data"`,
 	drawOrder:         ObjectLayerDrawOrder `json:"drawOrder"`, // "topdown" (default) or "index"
 	encoding:          LayerEncoding `json:"encoding"`, // "csv" (default) or "base64"
 	height:            i32 `json:"height"`, // Row count. Same as map height for fixed-size maps
 	id:                i32 `json:"id"`, // Incremental id - unique across all layers
 	image:             string `json:"image"`, // Image used by this layer
-	image_height:      u32 `json:"imageheight"`,
-	image_width:       u32 `json:"imagewidth"`,
+	image_height:      i32 `json:"imageheight"`,
+	image_width:       i32 `json:"imagewidth"`,
 	layers:            []Layer `json:"layers"`, // Array of layers
 	locked:            bool `json:"locked"`,
-	mode:              string `json:"mode"`,
+	mode:              BlendMode `json:"mode"`,
 	name:              string `json:"name"`, // Name assigned to this layer
-	objects:           []Object `json:"objects"`, // Array of objects
+	objects:           []Object `json:"objects"`, // Array of objects. objectgroup only.
 	offset_x:          f32 `json:"offsetx"`, // Horizontal layer offset in pixels (default: 0)
 	offset_y:          f32 `json:"offsety"`, // Vertical layer offset in pixels (default: 0)
 	opacity:           f32 `json:"opacity"`, // Value between 0 and 1
@@ -232,21 +251,20 @@ Layer :: struct {
 	properties:        []Property `json:"properties"`, // A list of properties (name, value, type)
 	repeat_x:          bool `json:"repeatx"`,
 	repeat_y:          bool `json:"repeaty"`,
-	start_x:           u32 `json:"startx"`,
-	start_y:           u32 `json:"starty"`,
+	start_x:           i32 `json:"startx"`,
+	start_y:           i32 `json:"starty"`,
 	tint_color:        string `json:"tintcolor"`,
 	transparent_color: string `json:"transparentcolor"`, // Hex-formatted color (#RRGGBB) (optional)
 	type:              LayerType `json:"type"`, // "tilelayer, "objectgroup, "imagelayer or "group"
 	visible:           bool `json:"visible"`, // Whether layer is shown or hidden in editor
-	width:             i32 `json:"width"`, // Column count. Same as map width for fixed-size maps
+	width:             i32 `json:"width"`, // Column count. Same as map width for fixed-size maps. tilelayer only.
 	x:                 i32 `json:"x"`, // Horizontal layer offset in tiles. Always 0
 	y:                 i32 `json:"y"`, // Vertical layer offset in tiles. Always 0
 }
 
 // Chunk is used to store the tile layer data for infinite maps.
 Chunk :: struct {
-	// data:              ArrayOrString `json:"data"`,
-	data:   []i32 `json:"data"`,
+	data:   ArrayOrString `json:"data"`,
 	height: i32 `json:"height"`, // Height in tiles
 	width:  i32 `json:"width"`, // Width in tiles
 	x:      i32 `json:"x"`, // X coordinate in tiles
@@ -258,7 +276,7 @@ Object :: struct {
 	ellipse:    bool `json:"ellipse"`, // Used to mark an object as an ellipse
 	gid:        i32 `json:"gid"`, // GID, only if object comes from a Tilemap
 	height:     f64 `json:"height"`, // Height in pixels, ignored if using a gid
-	id:         i32 `json:"id"`, // Incremental id - unique across all objects
+	id:         u32 `json:"id"`, // Incremental id - unique across all objects
 	name:       string `json:"name"`, // String assigned to name field in editor
 	opacity:    f32 `json:"opacity"`,
 	point:      bool `json:"point"`, // Used to mark an object as a point
@@ -267,12 +285,12 @@ Object :: struct {
 	properties: []Property `json:"properties"`, // A list of properties (name, value, type)
 	rotation:   f64 `json:"rotation"`, // Angle in degrees clockwise
 	template:   string `json:"template"`, // Reference to a template file, in case object is a template instance
-	text:       map[string]i32 `json:"text"`, // String key-value pairs
+	text:       Text `json:"text"`, // String key-value pairs
 	type:       string `json:"type"`, // String assigned to type field in editor
 	visible:    bool `json:"visible"`, // Whether object is shown in editor
+	width:      f64 `json:"width"`, // Width in pixels, ignored if using a gid
 	x:          f64 `json:"x"`, // X coordinate in pixels
 	y:          f64 `json:"y"`, // Y coordinate in pixels
-	width:      f64 `json:"width"`, // Width in pixels, ignored if using a gid
 }
 
 Text :: struct {
@@ -282,7 +300,7 @@ Text :: struct {
 	h_align:     string `json:"halign"`, // Horizontal alignment (center, right, justify or left (default))
 	italic:      bool `json:"italic"`, // Whether to use an italic font (default: false)
 	kerning:     bool `json:"kerning"`, // Whether to use kerning when placing characters (default: true)
-	pixel_size:  int `json:"pixelsize"`, // Pixel size of font (default: 16)
+	pixel_size:  i32 `json:"pixelsize"`, // Pixel size of font (default: 16)
 	strikeout:   bool `json:"strikeout"`, // Whether to strike out the text (default: false)
 	text:        string `json:"text"`, // Text
 	underline:   bool `json:"underline"`, // Whether to underline the text (default: false)
@@ -295,9 +313,9 @@ Coordinate :: struct {
 	y: f32 `json:"y"`,
 }
 
-Offset :: struct {
-	x: f32 `json:"x"`,
-	y: f32 `json:"y"`,
+TileOffset :: struct {
+	x: i32 `json:"x"`,
+	y: i32 `json:"y"`,
 }
 
 Transformations :: struct {
@@ -319,7 +337,7 @@ Tileset :: struct {
 	class:             string `json:"class"`,
 	columns:           i32 `json:"columns"`, // The number of tile columns in the tileset
 	fillmode:          string `json:"fillmode"`,
-	first_gid:         i32 `json:"firstgid"`, // GID corresponding to the first tile in the set
+	first_gid:         u32 `json:"firstgid"`, // GID corresponding to the first tile in the set
 	grid:              Grid `json:"grid"`, // (Optional) https://doc.mapeditor.org/en/stable/reference/tmx-map-format/#tmx-grid
 	image:             string `json:"image"`, // Image used for tiles in this set
 	image_height:      i32 `json:"imageheight"`, // Height of source image in pixels
@@ -331,14 +349,14 @@ Tileset :: struct {
 	source:            string `json:"source"`, // Only used if an external tileset is referred to
 	spacing:           i32 `json:"spacing"`, // Spacing between adjacent tiles in image (pixels)
 	terrains:          []Terrain `json:"terrains"`, // Array of Terrains (optional)
-	tile_count:        i32 `json:"tilecount"`, // The number of tiles in this tileset
+	tile_count:        u32 `json:"tilecount"`, // The number of tiles in this tileset
 	tiled_version:     string `json:"tiledversion"`,
 	tile_height:       i32 `json:"tileheight"`, // Maximum height of tiles in this set
-	tile_offset:       Offset `json:"tileoffset"`, // https://doc.mapeditor.org/en/stable/reference/tmx-map-format/#tmx-tileoffset
+	tile_offset:       TileOffset `json:"tileoffset"`, // https://doc.mapeditor.org/en/stable/reference/tmx-map-format/#tmx-tileoffset
 	tile_render_size:  string `json:"tilerendersize"`,
 	tiles:             []Tile `json:"tiles"`, // Array of Tiles (optional)
 	tile_width:        i32 `json:"tilewidth"`, // Maximum width of tiles in this set
-	// transformations: Transformations
+	transformations:   Transformations `json:"transformations"`,
 	transparent_color: string `json:"transparentcolor"`, // Hex-formatted color (#RRGGBB) (optional)
 	type:              string `json:"type"`, // "tileset" (for tileset files, since 1.0)
 	version:           string `json:"version"`,
@@ -359,14 +377,14 @@ Tile :: struct {
 	image:        string `json:"image"`, // Image representing this tile (optional)
 	image_height: i32 `json:"imageheight"`, // Height of the tile image in pixels
 	image_width:  i32 `json:"imagewidth"`, // Width of the tile image in pixels
-	x:            u32 `json:"x"`, // The X position of the sub-rectangle representing this tile (default: 0)
-	y:            u32 `json:"y"`, // The Y position of the sub-rectangle representing this tile (default: 0)
-	width:        u32 `json:"width"`, //   The width of the sub-rectangle representing this tile (defaults to the image width)
-	height:       u32 `json:"height"`, //   The height of the sub-rectangle representing this tile (defaults to the image height)
+	x:            i32 `json:"x"`, // The X position of the sub-rectangle representing this tile (default: 0)
+	y:            i32 `json:"y"`, // The Y position of the sub-rectangle representing this tile (default: 0)
+	width:        i32 `json:"width"`, //   The width of the sub-rectangle representing this tile (defaults to the image width)
+	height:       i32 `json:"height"`, //   The height of the sub-rectangle representing this tile (defaults to the image height)
 	object_group: Layer `json:"objectgroup"`, // Layer with type "objectgroup" (optional)
 	probability:  f32 `json:"probability"`, //  Percentage chance this tile is chosen when competing with others in the editor (default: 1)
 	properties:   []Property `json:"properties"`, // A list of properties (name, value, type)
-	terrain:      []i32 `json:"terrain"`, // Index of terrain for each corner of tile
+	terrain:      []i32 `json:"terrain"`, //[]WangSet // Index of terrain for each corner of tile
 	type:         string `json:"type"`, // The type of the tile (optional)
 }
 
@@ -375,25 +393,29 @@ Frame :: struct {
 	tile_id:  i32 `json:"tileid"`, // Local tile ID representing this frame
 }
 
-Properties :: struct {
-	name:         string `json:"name"`, //Name of the property
-	type:         string `json:"type"`, //Type of the property (string (default), int, float, bool, color, file, object or class (since 0.16, with color and file added in 0.17, object added in 1.4 and class added in 1.8))
-	propertytype: string `json:"propertytype"`, //Name of the custom property type, when applicable (since 1.8)
-	value:        Maybe(string) `json:"value"`, //Value of the property
+Property :: struct {
+	name:          string `json:"name"`, //Name of the property
+	type:          string `json:"type"`, //Type of the property (string (default), int, float, bool, color, file, object or class (since 0.16, with color and file added in 0.17, object added in 1.4 and class added in 1.8))
+	property_type: string `json:"propertytype"`, //Name of the custom property type, when applicable (since 1.8)
+	value:         Maybe(string) `json:"value"`, //Value of the property
 }
+
 
 Terrain :: struct {
 	name:       string `json:"name"`, // Name of terrain
-	properties: []Properties `json:"properties"`,
+	properties: []Property `json:"properties"`,
 	tile:       i32 `json:"tile"`, // Local ID of tile representing terrain
 }
 
+
 WangSet :: struct {
-	corner_colors: []WangColor `json:"cornercolors"`, // Array of Wang colors
-	edge_colors:   []WangColor `json:"edgecolors"`, // Array of Wang colors
-	name:          string `json:"name"`, // Name of the Wang set
-	tile:          i32 `json:"tile"`, // Local ID of tile representing the Wang set
-	wang_tiles:    []WangTile `json:"wangtiles"`, // Array of Wang tiles
+	class:      string `json:"class"`,
+	colors:     []WangColor `json:"colors"`, // Array of Wang colors
+	name:       string `json:"name"`, // Name of the Wang set
+	properties: []Property `json:"properties"`,
+	tile:       i32 `json:"tile"`, // Local ID of tile representing the Wang set
+	type:       string `json:"type"`,
+	wang_tiles: []WangTile `json:"wangtiles"`, // Array of Wang tiles
 }
 
 WangColor :: struct {
@@ -401,7 +423,7 @@ WangColor :: struct {
 	color:       string `json:"color"`, // Hex-formatted color (#RRGGBB or #AARRGGBB)
 	name:        string `json:"name"`, // Name of the Wang color
 	probability: f32 `json:"probability"`, // Probability used when randomizing
-	properties:  []Properties,
+	properties:  []Property `json:"properties"`,
 	tile:        i32 `json:"tile"`, // Local ID of tile representing the Wang color
 }
 

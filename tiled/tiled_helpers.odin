@@ -7,7 +7,7 @@ import fmt "core:fmt"
 
 // Returns the tileset and its index associated with a gid.
 // The index is useful if storing a slice of textures that corresponds to each tileset.
-get_tileset_from_gid :: proc(tilesets: []Tileset, gid: u32) -> (tileset: ^Tileset, index: int) {
+get_tileset_from_gid :: proc(tilesets: []Tileset, gid: i32) -> (tileset: ^Tileset, index: int) {
 	if len(tilesets) == 1 {
 		return &tilesets[0], 0
 	} else {
@@ -79,7 +79,7 @@ get_layer_pointer_by_name :: proc(name: string, t_map: Map) -> (^Layer, bool) {
 	return nil, false
 }
 
-get_object_by_id :: proc(id: u32, t_map: Map) -> (Object, bool) {
+get_object_by_id :: proc(id: i32, t_map: Map) -> (Object, bool) {
 	if id <= 0 do return {}, false
 	for layer in t_map.layers do for obj in layer.objects {
 		if obj.id == id do return obj, true
@@ -87,7 +87,7 @@ get_object_by_id :: proc(id: u32, t_map: Map) -> (Object, bool) {
 	return {}, false
 }
 
-get_object_pointer_by_id :: proc(id: u32, t_map: Map) -> (^Object, bool) {
+get_object_pointer_by_id :: proc(id: i32, t_map: Map) -> (^Object, bool) {
 	if id <= 0 do return nil, false
 	for layer in t_map.layers do for &obj in layer.objects {
 		if obj.id == id do return &obj, true

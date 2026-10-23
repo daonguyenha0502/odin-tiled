@@ -276,7 +276,7 @@ Object :: struct {
 	ellipse:    bool `json:"ellipse"`, // Used to mark an object as an ellipse
 	gid:        i32 `json:"gid"`, // GID, only if object comes from a Tilemap
 	height:     f64 `json:"height"`, // Height in pixels, ignored if using a gid
-	id:         u32 `json:"id"`, // Incremental id - unique across all objects
+	id:         i32 `json:"id"`, // Incremental id - unique across all objects
 	name:       string `json:"name"`, // String assigned to name field in editor
 	opacity:    f32 `json:"opacity"`,
 	point:      bool `json:"point"`, // Used to mark an object as a point
@@ -337,7 +337,7 @@ Tileset :: struct {
 	class:             string `json:"class"`,
 	columns:           i32 `json:"columns"`, // The number of tile columns in the tileset
 	fillmode:          string `json:"fillmode"`,
-	first_gid:         u32 `json:"firstgid"`, // GID corresponding to the first tile in the set
+	first_gid:         i32 `json:"firstgid"`, // GID corresponding to the first tile in the set
 	grid:              Grid `json:"grid"`, // (Optional) https://doc.mapeditor.org/en/stable/reference/tmx-map-format/#tmx-grid
 	image:             string `json:"image"`, // Image used for tiles in this set
 	image_height:      i32 `json:"imageheight"`, // Height of source image in pixels
@@ -349,7 +349,7 @@ Tileset :: struct {
 	source:            string `json:"source"`, // Only used if an external tileset is referred to
 	spacing:           i32 `json:"spacing"`, // Spacing between adjacent tiles in image (pixels)
 	terrains:          []Terrain `json:"terrains"`, // Array of Terrains (optional)
-	tile_count:        u32 `json:"tilecount"`, // The number of tiles in this tileset
+	tile_count:        i32 `json:"tilecount"`, // The number of tiles in this tileset
 	tiled_version:     string `json:"tiledversion"`,
 	tile_height:       i32 `json:"tileheight"`, // Maximum height of tiles in this set
 	tile_offset:       TileOffset `json:"tileoffset"`, // https://doc.mapeditor.org/en/stable/reference/tmx-map-format/#tmx-tileoffset

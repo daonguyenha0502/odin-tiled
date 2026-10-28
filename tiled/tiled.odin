@@ -44,7 +44,7 @@ parse_tilemap :: proc(path: string, alloc: mem.Allocator) -> (Map, bool) {
 
 // tries to parse tilemap and all external tilesets.
 // should probably be the default
-parse_tilemap_and_tilesets :: proc(path: string, alloc: mem.Allocator) -> Map {
+parse_tilemap_and_tilesets :: proc(path: string, alloc: mem.Allocator) -> (Map, bool) {
 	m, ok := parse_tilemap(path, alloc)
 
 	if !ok {
@@ -70,7 +70,7 @@ parse_tilemap_and_tilesets :: proc(path: string, alloc: mem.Allocator) -> Map {
 		external_ts.source = ts.source
 		ts = external_ts
 	}
-	return m
+	return m, true
 }
 
 // parse_tileset takes a Tiled tileset JSON file

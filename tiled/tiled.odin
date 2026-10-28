@@ -195,6 +195,29 @@ BlendMode :: enum {
 }
 
 
+ObjectAlignment :: enum {
+	UNSPECIFIED,
+	TOP_LEFT,
+	TOP,
+	TOP_RIGHT,
+	LEFT,
+	CENTER,
+	RIGHT,
+	BOTTOM_LEFT,
+	BOTTOM,
+	BOTTOM_RIGHT,
+	unspecified = UNSPECIFIED,
+	topleft = TOP_LEFT,
+	top = TOP,
+	topright = TOP_RIGHT,
+	left = LEFT,
+	center = CENTER,
+	right = RIGHT,
+	bottomleft = BOTTOM_LEFT,
+	bottom = BOTTOM,
+	bottomright = BOTTOM_RIGHT,
+}
+
 // Map describes a Tiled map.
 Map :: struct {
 	background_color:  string `json:"backgroundcolor"`, // Hex-formatted color (#RRGGBB or #AARRGGBB) (optional).
@@ -265,6 +288,7 @@ Layer :: struct {
 // Chunk is used to store the tile layer data for infinite maps.
 Chunk :: struct {
 	data:   ArrayOrString `json:"data"`,
+	// data:   []i32 `json:"data"`,
 	height: i32 `json:"height"`, // Height in tiles
 	width:  i32 `json:"width"`, // Width in tiles
 	x:      i32 `json:"x"`, // X coordinate in tiles
@@ -344,7 +368,7 @@ Tileset :: struct {
 	image_width:       i32 `json:"imagewidth"`, // Width of source image in pixels
 	margin:            i32 `json:"margin"`, // Buffer between image edge and first tile (pixels)
 	name:              string `json:"name"`, // Name given to this tileset
-	object_alignment:  string `json:"objectalignment"`,
+	object_alignment:  ObjectAlignment `json:"objectalignment"`,
 	properties:        []Property `json:"properties"`, // A list of properties (name, value, type)
 	source:            string `json:"source"`, // Only used if an external tileset is referred to
 	spacing:           i32 `json:"spacing"`, // Spacing between adjacent tiles in image (pixels)
@@ -371,6 +395,20 @@ Grid :: struct {
 	width:       i32 `json:"width"`, // Width of a grid cell
 }
 
+// object_group
+LayerObjectGroup :: struct {
+	id:       i32,
+	height:   i32,
+	name:     string,
+	opacity:  f32,
+	rotation: i32,
+	type:     string,
+	visible:  bool,
+	width:    i32,
+	x:        i32,
+	y:        i32,
+}
+
 Tile :: struct {
 	animation:    []Frame `json:"animation"`, // Array of Frames
 	id:           i32 `json:"id"`, // Local ID of the tile
@@ -381,7 +419,7 @@ Tile :: struct {
 	y:            i32 `json:"y"`, // The Y position of the sub-rectangle representing this tile (default: 0)
 	width:        i32 `json:"width"`, //   The width of the sub-rectangle representing this tile (defaults to the image width)
 	height:       i32 `json:"height"`, //   The height of the sub-rectangle representing this tile (defaults to the image height)
-	object_group: Layer `json:"objectgroup"`, // Layer with type "objectgroup" (optional)
+	object_group: LayerObjectGroup `json:"objectgroup"`, // Layer with type "objectgroup" (optional)
 	probability:  f32 `json:"probability"`, //  Percentage chance this tile is chosen when competing with others in the editor (default: 1)
 	properties:   []Property `json:"properties"`, // A list of properties (name, value, type)
 	terrain:      []i32 `json:"terrain"`, //[]WangSet // Index of terrain for each corner of tile
@@ -394,10 +432,10 @@ Frame :: struct {
 }
 
 Property :: struct {
-	name:          string `json:"name"`, //Name of the property
-	type:          string `json:"type"`, //Type of the property (string (default), int, float, bool, color, file, object or class (since 0.16, with color and file added in 0.17, object added in 1.4 and class added in 1.8))
-	property_type: string `json:"propertytype"`, //Name of the custom property type, when applicable (since 1.8)
-	value:         Maybe(string) `json:"value"`, //Value of the property
+	name:         string `json:"name"`, //Name of the property
+	type:         string `json:"type"`, //Type of the property (string (default), int, float, bool, color, file, object or class (since 0.16, with color and file added in 0.17, object added in 1.4 and class added in 1.8))
+	propertytype: string `json:"propertytype"`, //Name of the custom property type, when applicable (since 1.8)
+	value:        Maybe(string) `json:"value"`, //Value of the property
 }
 
 
@@ -412,7 +450,7 @@ WangSet :: struct {
 	class:      string `json:"class"`,
 	colors:     []WangColor `json:"colors"`, // Array of Wang colors
 	name:       string `json:"name"`, // Name of the Wang set
-	properties: []Property `json:"properties"`,
+	properties: []Property,
 	tile:       i32 `json:"tile"`, // Local ID of tile representing the Wang set
 	type:       string `json:"type"`,
 	wang_tiles: []WangTile `json:"wangtiles"`, // Array of Wang tiles
@@ -423,7 +461,7 @@ WangColor :: struct {
 	color:       string `json:"color"`, // Hex-formatted color (#RRGGBB or #AARRGGBB)
 	name:        string `json:"name"`, // Name of the Wang color
 	probability: f32 `json:"probability"`, // Probability used when randomizing
-	properties:  []Property `json:"properties"`,
+	properties:  []Property,
 	tile:        i32 `json:"tile"`, // Local ID of tile representing the Wang color
 }
 
@@ -441,4 +479,10 @@ ObjectTemplate :: struct {
 	type:    string `json:"type"`, // "template"
 	tileset: Tileset `json:"tileset"`, // External tileset used by the template (optional)
 	object:  Object `json:"object"`, // The object instantiated by this template
+}
+
+
+TilesetType :: enum {
+	Based_on_Tileset_Image,
+	Collection_of_Images,
 }
